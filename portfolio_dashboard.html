@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ISA Portfolio Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg: #0a0c10;
+    --surface: #111418;
+    --surface2: #191d24;
+    --border: rgba(255,255,255,0.07);
+    --gold: #c9a84c;
+    --gold-light: #e8c96e;
+    --gold-dim: rgba(201,168,76,0.15);
+    --green: #4ade80;
+    --green-dim: rgba(74,222,128,0.12);
+    --red: #f87171;
+    --red-dim: rgba(248,113,113,0.12);
+    --blue: #60a5fa;
+    --text: #e8e4dc;
+    --muted: #8a8680;
+    --accent: #c9a84c;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* Background texture */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: 
+      radial-gradient(ellipse 80% 50% at 20% 10%, rgba(201,168,76,0.04) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 80% 80%, rgba(96,165,250,0.03) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page { position: relative; z-index: 1; }
+
+  /* ─── Header ─── */
+  header {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    padding: 28px 40px 20px;
+    border-bottom: 1px solid var(--border);
+    gap: 20px;
+  }
+
+  .header-left { display: flex; flex-direction: column; gap: 4px; }
+  .header-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 28px;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+  .header-subtitle { color: var(--muted); font-size: 12px; font-family: 'DM Mono', monospace; letter-spacing: 0.08em; text-transform: uppercase; }
+
+  .header-center {
+    text-align: center;
+  }
+  .total-value {
+    font-family: 'DM Serif Display', serif;
+    font-size: 42px;
+    color: var(--gold-light);
+    letter-spacing: -0.03em;
+  }
+  .total-return-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--green-dim);
+    border: 1px solid rgba(74,222,128,0.25);
+    border-radius: 20px;
+    padding: 3px 12px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--green);
+    margin-top: 6px;
+  }
+
+  .header-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+  }
+
+  .upload-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--gold-dim);
+    border: 1px solid rgba(201,168,76,0.3);
+    border-radius: 8px;
+    padding: 8px 16px;
+    color: var(--gold-light);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.05em;
+  }
+  .upload-btn:hover { background: rgba(201,168,76,0.25); border-color: var(--gold); }
+  .upload-btn svg { width: 14px; height: 14px; }
+  #fileInput { display: none; }
+
+  .date-info { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); text-align: right; }
+
+  /* ─── KPI Strip ─── */
+  .kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .kpi {
+    padding: 20px 28px;
+    border-right: 1px solid var(--border);
+    animation: fadeUp 0.5s ease both;
+  }
+  .kpi:last-child { border-right: none; }
+  .kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-family: 'DM Mono', monospace; margin-bottom: 6px; }
+  .kpi-value { font-family: 'DM Serif Display', serif; font-size: 24px; letter-spacing: -0.02em; }
+  .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 2px; font-family: 'DM Mono', monospace; }
+  .pos { color: var(--green); }
+  .neg { color: var(--red); }
+  .gold { color: var(--gold-light); }
+
+  /* ─── Main grid ─── */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    grid-template-rows: auto auto;
+    gap: 1px;
+    background: var(--border);
+  }
+
+  .panel {
+    background: var(--bg);
+    padding: 28px 32px;
+    animation: fadeUp 0.6s ease both;
+  }
+  .panel-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16px;
+    color: var(--gold);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .panel-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ─── Holdings Table ─── */
+  .holdings-table { width: 100%; border-collapse: collapse; }
+  .holdings-table th {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    text-align: left;
+    padding: 0 10px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .holdings-table th:not(:first-child) { text-align: right; }
+  .holdings-table td {
+    padding: 10px 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+  }
+  .holdings-table td:first-child { font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; color: var(--text); }
+  .holdings-table td:not(:first-child) { text-align: right; }
+  .holdings-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .holdings-table tr.total-row td { 
+    border-top: 1px solid var(--border);
+    border-bottom: none;
+    color: var(--gold-light);
+    font-weight: 500;
+    padding-top: 14px;
+  }
+
+  .bar-cell { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+  .mini-bar { height: 4px; border-radius: 2px; background: var(--gold-dim); overflow: hidden; width: 50px; }
+  .mini-bar-fill { height: 100%; border-radius: 2px; background: var(--gold); }
+  .mini-bar-fill.green { background: var(--green); }
+  .mini-bar-fill.red { background: var(--red); }
+
+  /* ─── Charts ─── */
+  .chart-wrap { position: relative; }
+  .chart-wrap canvas { display: block; }
+
+  /* ─── Bottom panels ─── */
+  .bottom-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+    border-top: 1px solid var(--border);
+  }
+
+  /* ─── Performance ranking ─── */
+  .rank-list { display: flex; flex-direction: column; gap: 8px; }
+  .rank-item {
+    display: grid;
+    grid-template-columns: 160px 1fr 60px;
+    align-items: center;
+    gap: 12px;
+  }
+  .rank-name { font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rank-bar-track { height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; }
+  .rank-bar-fill { height: 100%; border-radius: 3px; transition: width 0.8s ease; }
+  .rank-pct { font-family: 'DM Mono', monospace; font-size: 12px; text-align: right; }
+
+  /* ─── Stats grid ─── */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .stat-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .stat-box-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-family: 'DM Mono', monospace; margin-bottom: 6px; }
+  .stat-box-value { font-family: 'DM Serif Display', serif; font-size: 20px; letter-spacing: -0.02em; }
+  .stat-box-sub { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; }
+
+  /* ─── Animations ─── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ─── Responsive ─── */
+  @media (max-width: 1100px) {
+    header { grid-template-columns: 1fr; text-align: center; }
+    .header-right { align-items: center; }
+    .kpi-strip { grid-template-columns: repeat(3, 1fr); }
+    .main-grid { grid-template-columns: 1fr; }
+    .bottom-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ─── Tooltip ─── */
+  .tooltip-note {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 14px;
+    font-family: 'DM Mono', monospace;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+
+  /* Section label */
+  .section-label {
+    padding: 10px 32px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <header>
+    <div class="header-left">
+      <div class="header-title">ISA Portfolio</div>
+      <div class="header-subtitle">Investment Dashboard · DIY Model</div>
+    </div>
+    <div class="header-center">
+      <div class="total-value" id="totalValue">£16,721.44</div>
+      <div class="total-return-badge">▲ <span id="totalReturn">+34.63%</span> Total Return</div>
+    </div>
+    <div class="header-right">
+      <label for="fileInput" class="upload-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Update with new CSV
+      </label>
+      <input type="file" id="fileInput" accept=".csv">
+      <div class="date-info" id="dateInfo">Period: 21 Feb 2025 – 21 Feb 2026</div>
+    </div>
+  </header>
+
+  <!-- KPI Strip -->
+  <div class="kpi-strip" id="kpiStrip">
+    <div class="kpi" style="animation-delay:0.05s">
+      <div class="kpi-label">Portfolio Value</div>
+      <div class="kpi-value gold" id="kpiValue">£16,721</div>
+      <div class="kpi-sub" id="kpiInitial">Initial: £12,617</div>
+    </div>
+    <div class="kpi" style="animation-delay:0.1s">
+      <div class="kpi-label">Total Return</div>
+      <div class="kpi-value pos" id="kpiReturn">+34.63%</div>
+      <div class="kpi-sub">Over Period</div>
+    </div>
+    <div class="kpi" style="animation-delay:0.15s">
+      <div class="kpi-label">Top Performer</div>
+      <div class="kpi-value pos" id="kpiBest">Asia +87.09%</div>
+      <div class="kpi-sub" id="kpiBestVal">£287.30 current</div>
+    </div>
+    <div class="kpi" style="animation-delay:0.2s">
+      <div class="kpi-label">Worst Performer</div>
+      <div class="kpi-value" id="kpiWorst" style="color:var(--text)">Cash 0.00%</div>
+      <div class="kpi-sub" id="kpiWorstVal">£280.66 current</div>
+    </div>
+    <div class="kpi" style="animation-delay:0.25s">
+      <div class="kpi-label">Holdings</div>
+      <div class="kpi-value gold" id="kpiCount">17</div>
+      <div class="kpi-sub">Active Positions</div>
+    </div>
+  </div>
+
+  <!-- Section label -->
+  <div class="section-label">Holdings &amp; Allocation</div>
+
+  <!-- Main Grid -->
+  <div class="main-grid">
+
+    <!-- Holdings Table -->
+    <div class="panel" style="animation-delay:0.3s">
+      <div class="panel-title">Portfolio Holdings</div>
+      <table class="holdings-table" id="holdingsTable">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Current Value</th>
+            <th>Return %</th>
+            <th>Allocation</th>
+            <th>Gain/Loss</th>
+          </tr>
+        </thead>
+        <tbody id="holdingsBody"></tbody>
+        <tfoot id="holdingsFoot"></tfoot>
+      </table>
+      <div class="tooltip-note">
+        ℹ Gain/Loss = Current Value − Initial Value − Net Contributions (simplified estimate)
+      </div>
+    </div>
+
+    <!-- Allocation Doughnut -->
+    <div class="panel" style="animation-delay:0.35s">
+      <div class="panel-title">Allocation Breakdown</div>
+      <div class="chart-wrap" style="height:280px;">
+        <canvas id="donutChart"></canvas>
+      </div>
+      <hr class="divider">
+      <div class="panel-title" style="margin-top:8px">Return vs Allocation</div>
+      <div class="chart-wrap" style="height:240px;">
+        <canvas id="bubbleChart"></canvas>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Section label -->
+  <div class="section-label">Performance Analysis</div>
+
+  <!-- Bottom Grid -->
+  <div class="bottom-grid">
+
+    <!-- Performance Ranking -->
+    <div class="panel" style="animation-delay:0.4s">
+      <div class="panel-title">Return Ranking</div>
+      <div class="rank-list" id="rankList"></div>
+    </div>
+
+    <!-- Bar Chart: Current Values -->
+    <div class="panel" style="animation-delay:0.45s">
+      <div class="panel-title">Value by Holding</div>
+      <div class="chart-wrap" style="height:340px;">
+        <canvas id="barChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Stats Summary -->
+    <div class="panel" style="animation-delay:0.5s">
+      <div class="panel-title">Portfolio Analytics</div>
+      <div class="stats-grid" id="statsGrid"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+// ─── DATA ───────────────────────────────────────────────────────────────────
+let portfolioData = {
+  period: "21 Feb 2025 – 21 Feb 2026",
+  holdings: [
+    { name: "Country or Sector",         initial: 2271.87,  contrib: 98.90,   returnPct: 28.67, current: 2812.63, alloc: 16.82 },
+    { name: "MSCI World",                initial: 113.37,   contrib: 0.96,    returnPct: 15.54, current: 130.49,  alloc: 0.78 },
+    { name: "US Small and Mid Cap",      initial: 355.74,   contrib: 4.08,    returnPct: 7.42,  current: 377.06,  alloc: 2.25 },
+    { name: "Small Cap Global",          initial: 0.00,     contrib: 99.76,   returnPct: 51.62, current: 101.47,  alloc: 0.61 },
+    { name: "S&P 500",                   initial: 159.48,   contrib: 90.25,   returnPct: 11.43, current: 277.73,  alloc: 1.66 },
+    { name: "Nasdaq",                    initial: 27.10,    contrib: 0.00,    returnPct: 11.61, current: 30.20,   alloc: 0.18 },
+    { name: "Europe Small and Mid Cap",  initial: 265.47,   contrib: 67.49,   returnPct: 24.72, current: 273.38,  alloc: 1.63 },
+    { name: "Emerging Markets",          initial: 1616.59,  contrib: 858.21,  returnPct: 27.53, current: 3022.16, alloc: 18.07 },
+    { name: "Decarbonisation",           initial: 272.77,   contrib: 35.65,   returnPct: 31.40, current: 330.50,  alloc: 1.98 },
+    { name: "UK",                        initial: 839.18,   contrib: 254.93,  returnPct: 20.27, current: 757.10,  alloc: 4.53 },
+    { name: "Bonds, Gilts & Money Mkt",  initial: 2541.00,  contrib: 1236.54, returnPct: 7.41,  current: 1465.61, alloc: 8.76 },
+    { name: "Cash",                      initial: 0.00,     contrib: 280.66,  returnPct: 0.00,  current: 280.66,  alloc: 1.68 },
+    { name: "UK Dividend",               initial: 574.27,   contrib: 424.39,  returnPct: 20.50, current: 256.23,  alloc: 1.53 },
+    { name: "Global Dividend",           initial: 376.73,   contrib: 51.20,   returnPct: 17.96, current: 402.56,  alloc: 2.41 },
+    { name: "Healthcare",                initial: 980.14,   contrib: 235.40,  returnPct: 13.53, current: 1362.91, alloc: 8.15 },
+    { name: "Commodities & Resources",   initial: 2223.58,  contrib: 360.43,  returnPct: 66.41, current: 4553.45, alloc: 27.23 },
+    { name: "Asia",                      initial: 0.00,     contrib: 249.43,  returnPct: 87.09, current: 287.30,  alloc: 1.72 },
+  ],
+  totalInitial: 12617.29,
+  totalCurrent: 16721.44,
+  totalReturn: 34.63
+};
+
+let donutChart, bubbleChartInst, barChartInst;
+
+// ─── COLOUR PALETTE ──────────────────────────────────────────────────────────
+const palette = [
+  '#c9a84c','#e8c96e','#4ade80','#60a5fa','#f472b6','#a78bfa',
+  '#34d399','#fb923c','#38bdf8','#facc15','#f87171','#818cf8',
+  '#2dd4bf','#fb7185','#a3e635','#e879f9','#fbbf24'
+];
+
+// ─── FORMAT HELPERS ──────────────────────────────────────────────────────────
+const fmt = v => '£' + v.toLocaleString('en-GB', {minimumFractionDigits:2, maximumFractionDigits:2});
+const fmtPct = v => (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
+
+// ─── RENDER ──────────────────────────────────────────────────────────────────
+function render(data) {
+  updateHeader(data);
+  updateKPIs(data);
+  renderTable(data);
+  renderDonut(data);
+  renderBubble(data);
+  renderBar(data);
+  renderRanking(data);
+  renderStats(data);
+}
+
+function updateHeader(data) {
+  document.getElementById('totalValue').textContent = fmt(data.totalCurrent);
+  document.getElementById('totalReturn').textContent = fmtPct(data.totalReturn);
+  document.getElementById('dateInfo').textContent = 'Period: ' + data.period;
+}
+
+function updateKPIs(data) {
+  const sorted = [...data.holdings].sort((a,b) => b.returnPct - a.returnPct);
+  const best = sorted[0], worst = sorted[sorted.length-1];
+  document.getElementById('kpiValue').textContent = '£' + Math.round(data.totalCurrent).toLocaleString('en-GB');
+  document.getElementById('kpiInitial').textContent = 'Initial: £' + Math.round(data.totalInitial).toLocaleString('en-GB');
+  document.getElementById('kpiReturn').textContent = fmtPct(data.totalReturn);
+  document.getElementById('kpiBest').textContent = `${best.name.split(' ')[0]} ${fmtPct(best.returnPct)}`;
+  document.getElementById('kpiBestVal').textContent = fmt(best.current) + ' current';
+  document.getElementById('kpiWorst').textContent = `${worst.name.split(' ')[0]} ${fmtPct(worst.returnPct)}`;
+  document.getElementById('kpiWorstVal').textContent = fmt(worst.current) + ' current';
+  document.getElementById('kpiCount').textContent = data.holdings.length;
+}
+
+function renderTable(data) {
+  const tbody = document.getElementById('holdingsBody');
+  const tfoot = document.getElementById('holdingsFoot');
+  tbody.innerHTML = '';
+  const maxAlloc = Math.max(...data.holdings.map(h => h.alloc));
+  const maxReturn = Math.max(...data.holdings.map(h => h.returnPct));
+
+  data.holdings.forEach((h, i) => {
+    const gain = h.current - h.initial - h.contrib;
+    const isPos = h.returnPct >= 0;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${h.name}</td>
+      <td>${fmt(h.current)}</td>
+      <td class="${isPos ? 'pos' : 'neg'}">${fmtPct(h.returnPct)}</td>
+      <td>
+        <div class="bar-cell">
+          <div class="mini-bar"><div class="mini-bar-fill" style="width:${(h.alloc/maxAlloc)*100}%"></div></div>
+          ${h.alloc.toFixed(2)}%
+        </div>
+      </td>
+      <td class="${gain >= 0 ? 'pos' : 'neg'}">${gain >= 0 ? '+' : ''}${fmt(gain)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  const totalGain = data.totalCurrent - data.totalInitial;
+  tfoot.innerHTML = `<tr class="total-row">
+    <td>TOTAL</td>
+    <td>${fmt(data.totalCurrent)}</td>
+    <td class="pos">${fmtPct(data.totalReturn)}</td>
+    <td>100.00%</td>
+    <td class="pos">+${fmt(totalGain)}</td>
+  </tr>`;
+}
+
+function renderDonut(data) {
+  if (donutChart) donutChart.destroy();
+  const ctx = document.getElementById('donutChart').getContext('2d');
+  donutChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: data.holdings.map(h => h.name),
+      datasets: [{
+        data: data.holdings.map(h => h.alloc),
+        backgroundColor: palette,
+        borderColor: '#0a0c10',
+        borderWidth: 2,
+        hoverOffset: 8
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '65%',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#191d24',
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          titleColor: '#e8c96e',
+          bodyColor: '#8a8680',
+          callbacks: {
+            label: ctx => ` ${ctx.label}: ${ctx.raw.toFixed(2)}%`
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderBubble(data) {
+  if (bubbleChartInst) bubbleChartInst.destroy();
+  const ctx = document.getElementById('bubbleChart').getContext('2d');
+  const datasets = data.holdings.map((h, i) => ({
+    label: h.name,
+    data: [{ x: h.alloc, y: h.returnPct, r: Math.sqrt(h.current) / 4.5 }],
+    backgroundColor: palette[i % palette.length] + '99',
+    borderColor: palette[i % palette.length],
+    borderWidth: 1
+  }));
+  bubbleChartInst = new Chart(ctx, {
+    type: 'bubble',
+    data: { datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          title: { display: true, text: 'Allocation %', color: '#8a8680', font: { family: 'DM Mono', size: 10 } },
+          ticks: { color: '#8a8680', font: { family: 'DM Mono', size: 10 } },
+          grid: { color: 'rgba(255,255,255,0.05)' }
+        },
+        y: {
+          title: { display: true, text: 'Return %', color: '#8a8680', font: { family: 'DM Mono', size: 10 } },
+          ticks: { color: '#8a8680', font: { family: 'DM Mono', size: 10 }, callback: v => v + '%' },
+          grid: { color: 'rgba(255,255,255,0.05)' }
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#191d24',
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          titleColor: '#e8c96e',
+          bodyColor: '#8a8680',
+          callbacks: {
+            title: items => items[0].dataset.label,
+            label: ctx => [` Return: ${ctx.raw.y.toFixed(2)}%`, ` Allocation: ${ctx.raw.x.toFixed(2)}%`]
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderBar(data) {
+  if (barChartInst) barChartInst.destroy();
+  const ctx = document.getElementById('barChart').getContext('2d');
+  const sorted = [...data.holdings].sort((a,b) => b.current - a.current);
+  barChartInst = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: sorted.map(h => h.name.length > 14 ? h.name.slice(0,14)+'…' : h.name),
+      datasets: [
+        {
+          label: 'Current Value',
+          data: sorted.map(h => h.current),
+          backgroundColor: sorted.map((_, i) => palette[i % palette.length] + 'cc'),
+          borderColor: sorted.map((_, i) => palette[i % palette.length]),
+          borderWidth: 1,
+          borderRadius: 4
+        },
+        {
+          label: 'Initial Value',
+          data: sorted.map(h => h.initial),
+          backgroundColor: 'rgba(255,255,255,0.06)',
+          borderColor: 'rgba(255,255,255,0.15)',
+          borderWidth: 1,
+          borderRadius: 4
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: 'y',
+      scales: {
+        x: {
+          ticks: { color: '#8a8680', font: { family: 'DM Mono', size: 10 }, callback: v => '£' + (v/1000).toFixed(0)+'k' },
+          grid: { color: 'rgba(255,255,255,0.05)' }
+        },
+        y: {
+          ticks: { color: '#e8e4dc', font: { family: 'DM Sans', size: 11 } },
+          grid: { color: 'rgba(255,255,255,0.03)' }
+        }
+      },
+      plugins: {
+        legend: {
+          labels: { color: '#8a8680', font: { family: 'DM Mono', size: 10 }, boxWidth: 12 }
+        },
+        tooltip: {
+          backgroundColor: '#191d24',
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          titleColor: '#e8c96e',
+          bodyColor: '#8a8680',
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: £${ctx.raw.toLocaleString('en-GB',{minimumFractionDigits:2})}`
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderRanking(data) {
+  const sorted = [...data.holdings].sort((a,b) => b.returnPct - a.returnPct);
+  const maxR = sorted[0].returnPct;
+  const el = document.getElementById('rankList');
+  el.innerHTML = sorted.map((h, i) => {
+    const isPos = h.returnPct >= 0;
+    const w = Math.abs(h.returnPct) / Math.abs(maxR) * 100;
+    const col = isPos
+      ? `hsl(${140 - i*5},70%,55%)`
+      : '#f87171';
+    return `<div class="rank-item">
+      <div class="rank-name">${i+1}. ${h.name}</div>
+      <div class="rank-bar-track">
+        <div class="rank-bar-fill" style="width:${w}%;background:${col}"></div>
+      </div>
+      <div class="rank-pct ${isPos?'pos':'neg'}">${fmtPct(h.returnPct)}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderStats(data) {
+  const returns = data.holdings.map(h => h.returnPct);
+  const avg = returns.reduce((a,b)=>a+b,0)/returns.length;
+  const variance = returns.reduce((s,r)=>s+Math.pow(r-avg,2),0)/returns.length;
+  const stdDev = Math.sqrt(variance);
+  const positiveCount = returns.filter(r => r > 0).length;
+  const weightedReturn = data.holdings.reduce((s,h) => s + h.returnPct * (h.alloc/100), 0);
+  const absGain = data.totalCurrent - data.totalInitial;
+  const totalContrib = data.holdings.reduce((s,h)=>s+h.contrib,0);
+  const organicGain = absGain - totalContrib;
+
+  const stats = [
+    { label: 'Avg Return', value: fmtPct(avg), sub: 'Unweighted mean', cls: avg>=0?'pos':'neg' },
+    { label: 'Wtd Return', value: fmtPct(weightedReturn), sub: 'Allocation weighted', cls: 'pos' },
+    { label: 'Volatility', value: stdDev.toFixed(2) + '%', sub: 'Std dev of returns', cls: 'gold' },
+    { label: 'Winners', value: `${positiveCount} / ${data.holdings.length}`, sub: 'Positive returns', cls: 'pos' },
+    { label: 'Abs Gain', value: fmt(absGain), sub: 'Total value added', cls: 'pos' },
+    { label: 'Organic Gain', value: fmt(organicGain), sub: 'Excl. new contributions', cls: organicGain>=0?'pos':'neg' },
+    { label: 'Net Contrib', value: fmt(totalContrib), sub: 'New money added', cls: 'gold' },
+    { label: 'Largest Hold.', value: data.holdings.sort((a,b)=>b.alloc-a.alloc)[0].alloc.toFixed(1)+'%', sub: 'Commodities & Res.', cls: 'gold' },
+  ];
+
+  document.getElementById('statsGrid').innerHTML = stats.map(s => `
+    <div class="stat-box">
+      <div class="stat-box-label">${s.label}</div>
+      <div class="stat-box-value ${s.cls}">${s.value}</div>
+      <div class="stat-box-sub">${s.sub}</div>
+    </div>`).join('');
+}
+
+// ─── CSV PARSER ──────────────────────────────────────────────────────────────
+function parseCSV(text) {
+  const lines = text.split('\n').filter(l => l.trim());
+  
+  // Extract period from first line
+  let period = '';
+  const periodMatch = lines[0].match(/(\d+\s+\w+\s+\d{4})\s*(?:to|-)\s*(\d+\s+\w+\s+\d{4})/i);
+  if (periodMatch) period = periodMatch[1] + ' – ' + periodMatch[2];
+
+  const holdings = [];
+  let totalInitial = 0, totalCurrent = 0, totalReturn = 0;
+
+  // Find header row
+  let dataStart = 2;
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i].toLowerCase().includes('portfolio name')) { dataStart = i+1; break; }
+  }
+
+  const stripPound = s => parseFloat(s.replace(/[£,\s]/g,'')) || 0;
+  const stripPct = s => parseFloat(s.replace(/[%\s]/g,'')) || 0;
+
+  for (let i = dataStart; i < lines.length; i++) {
+    const row = parseCSVRow(lines[i]);
+    if (!row[0] || row[0].trim() === '') continue;
+    
+    if (row[2] && row[2].trim().toLowerCase() === 'total') {
+      totalInitial = stripPound(row[3]);
+      totalReturn = stripPct(row[6]);
+      totalCurrent = stripPound(row[6+1] || row[7]);
+      // fallback: parse current from last known cols
+      // Try col index 6 for value at end
+      for (let c = 0; c < row.length; c++) {
+        if (row[c] && row[c].includes('£')) {
+          const v = stripPound(row[c]);
+          if (v > 10000) totalCurrent = v;
+        }
+      }
+      continue;
+    }
+
+    if (row.length < 6) continue;
+    const name = row[0].trim().replace(/^"/, '').replace(/"$/, '');
+    const initial = stripPound(row[3]);
+    const contrib = stripPound(row[4]);
+    const returnPct = stripPct(row[5]);
+    const current = stripPound(row[6]);
+    const alloc = stripPct(row[7]);
+
+    if (name && current > 0) {
+      holdings.push({ name, initial, contrib, returnPct, current, alloc });
+    }
+  }
+
+  // Recalculate totals if not parsed
+  if (totalCurrent === 0) totalCurrent = holdings.reduce((s,h)=>s+h.current,0);
+  if (totalInitial === 0) totalInitial = holdings.reduce((s,h)=>s+h.initial,0);
+
+  return { period: period || 'Uploaded Period', holdings, totalInitial, totalCurrent, totalReturn };
+}
+
+function parseCSVRow(line) {
+  const result = [];
+  let current = '', inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    if (line[i] === '"') { inQuotes = !inQuotes; continue; }
+    if (line[i] === ',' && !inQuotes) { result.push(current); current = ''; continue; }
+    current += line[i];
+  }
+  result.push(current);
+  return result;
+}
+
+// ─── FILE UPLOAD ─────────────────────────────────────────────────────────────
+document.getElementById('fileInput').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const parsed = parseCSV(ev.target.result);
+      if (parsed.holdings.length > 0) {
+        portfolioData = parsed;
+        render(portfolioData);
+      } else {
+        alert('Could not parse CSV. Please check the file format matches the expected layout.');
+      }
+    } catch(err) {
+      console.error(err);
+      alert('Error parsing CSV: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+});
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+render(portfolioData);
+</script>
+</body>
+</html>
